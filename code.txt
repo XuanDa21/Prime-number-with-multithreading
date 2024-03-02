@@ -1,0 +1,85 @@
+#include <iostream>
+#include <thread>
+#include <mutex>
+#include <vector>
+
+class PrimeCounter {
+private:
+    int start_;
+    int end_;
+    int count_;
+
+public:
+    PrimeCounter(int start, int end) : start_(start), end_(end), count_(0) {}
+
+    void countPrimes() {
+        for (int i = start_; i <= end_; i++) {
+            bool isPrime = true;
+            for (int j = 2; j < i; j++) {
+                if (i % j == 0) {
+                    isPrime = false;
+                    break;
+                }
+            }
+            if (isPrime) {
+                count_++;
+            }
+        }
+    }
+
+    int getCount() const {
+        return count_;
+    }
+};
+
+class PrimeCounterManager {
+private:
+    int n_;
+    int m_;
+    std::vector<PrimeCounter> counters_;
+    std::mutex mutex_;
+
+public:
+    PrimeCounterManager(int n, int m) : n_(n), m_(m) {
+        int rangeSize = n_ / m_;
+        int start = 1;
+        int end = rangeSize;
+        for (int i = 1; i <= m_; i++) {
+            if (i == m_) {
+                end = n_;
+            }
+            counters_.push_back(PrimeCounter(start, end));
+            start = end + 1;
+            end += rangeSize;
+        }
+    }
+
+    void startCounting() {
+        std::vector<std::thread> threads;
+        for (int i = 0; i < m_; i++) {
+            threads.push_back(std::thread(&PrimeCounter::countPrimes, &counters_[i]));
+        }
+        for (int i = 0; i < m_; i++) {
+            threads[i].join();
+        }
+        int totalCount = 0;
+        for (int i = 0; i < m_; i++) {
+            totalCount += counters_[i].getCount();
+        }
+        std::lock_guard<std::mutex> lock(mutex_);
+        std::cout << "Total count of primes in [1.." << n_ << "]: " << totalCount << std::endl;
+    }
+};
+
+int main() {
+    int n, m;
+    std::cout << "Enter value of n: ";
+    std::cin >> n;
+    std::cout << "Enter value of m: ";
+    std::cin >> m;
+
+    PrimeCounterManager manager(n, m);
+    manager.startCounting();
+
+    return 0;
+}
